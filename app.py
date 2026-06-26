@@ -1,6 +1,7 @@
 # app.py (ملف مُعدّل بالكامل)
 import os
 import json
+import subprocess
 import re
 import socket
 import sys
@@ -27,8 +28,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # ============== بيانات المسؤول ==============
-ADMIN_USERNAME = "8394089237"
-ADMIN_PASSWORD_RAW = "8394089237"
+ADMIN_USERNAME = "8091512031"
+ADMIN_PASSWORD_RAW = "8091512031"
 
 # ============== إعدادات البوت والإشعارات ==============
 BOT_TOKEN = "8669754436:AAG-XGfy4I_-X5FKDMb5DMDzhnowT3-wnSE"
