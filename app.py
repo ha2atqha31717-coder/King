@@ -1,9 +1,7 @@
-# app.py (ملف مُعدّل بالكامل)
 import os
 import json
 import subprocess
 import re
-import socket
 import sys
 import hashlib
 import secrets
@@ -13,6 +11,7 @@ import requests
 import shutil
 import zipfile
 import signal
+import psutil
 from datetime import datetime, timedelta
 from flask import Flask, send_from_directory, request, jsonify, session, redirect, make_response
 
@@ -28,14 +27,15 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # ============== بيانات المسؤول ==============
-ADMIN_USERNAME = "8091512031"
-ADMIN_PASSWORD_RAW = "8091512031"
+ADMIN_USERNAME = "8075573334"
+ADMIN_PASSWORD_RAW = "8075573334"
 
 # ============== إعدادات البوت والإشعارات ==============
 BOT_TOKEN = "8669754436:AAG-XGfy4I_-X5FKDMb5DMDzhnowT3-wnSE"
 ADMIN_TELEGRAM_ID = 8394089237
 ADMIN_TELEGRAM_USERNAME = "@K_I_G_M"
 
+# ============== دوال الإشعارات ==============
 def notify_admin(message: str):
     """إرسال إشعار للأدمن على تليجرام"""
     try:
@@ -47,6 +47,38 @@ def notify_admin(message: str):
     except Exception:
         pass
 
+def notify_user(telegram_id: str, message: str):
+    """إرسال إشعار للمستخدم عبر تيليجرام"""
+    if not telegram_id:
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": telegram_id, "text": message, "parse_mode": "Markdown"},
+            timeout=10
+        )
+    except Exception:
+        pass
+
+def get_user_telegram_id(username: str):
+    """جلب معرف تيليجرام المستخدم"""
+    user = db["users"].get(username)
+    if user:
+        return user.get("telegram_id")
+    return None
+
+def get_pending_users_list():
+    """جلب المستخدمين المعلقين"""
+    pending = []
+    for username, data in db["users"].items():
+        if data.get("status") == "pending" and username != ADMIN_USERNAME:
+            pending.append({
+                "username": username,
+                "created_at": data.get("created_at"),
+                "telegram_id": data.get("telegram_id")
+            })
+    return pending
+
 # ============== قاعدة البيانات ==============
 DB_FILE = os.path.join(BASE_DIR, "db.json")
 
@@ -55,7 +87,6 @@ def load_db():
         try:
             with open(DB_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # تأكد من وجود الحقول الجديدة
                 if "plans" not in data:
                     data["plans"] = {}
                 return data
@@ -74,7 +105,8 @@ def load_db():
                 "telegram_id": None,
                 "api_key": None,
                 "storage_limit": 10240,
-                "plan": "admin"
+                "plan": "admin",
+                "status": "approved"
             }
         },
         "servers": {},
@@ -124,7 +156,6 @@ def get_assigned_port():
 
 # ============== كشف الملف الرئيسي ==============
 def detect_main_file(srv_path: str, server_type: str) -> str:
-    """يكشف ملف التشغيل الرئيسي تلقائياً"""
     if server_type == "Node.js":
         pkg = os.path.join(srv_path, "package.json")
         if os.path.exists(pkg):
@@ -147,7 +178,6 @@ def detect_main_file(srv_path: str, server_type: str) -> str:
         js_files = [f for f in os.listdir(srv_path) if f.endswith('.js')]
         return js_files[0] if js_files else ""
     else:
-        # Python - أولوية main.py
         for candidate in ["main.py", "bot.py", "app.py", "index.py", "run.py", "start.py"]:
             if os.path.exists(os.path.join(srv_path, candidate)):
                 return candidate
@@ -386,12 +416,14 @@ def admin_panel():
         return redirect('/login')
     return send_from_directory(BASE_DIR, 'admin_panel.html')
 
-# ============== API المصادقة ==============
+# ============== API المصادقة (مع نظام الموافقة) ==============
 @app.route('/api/register', methods=['POST'])
 def api_register():
     data = request.get_json()
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    telegram_id = data.get("telegram_id", "").strip()
+
     if not username or not password:
         return jsonify({"success": False, "message": "جميع الحقول مطلوبة"})
     if len(username) < 3:
@@ -403,7 +435,7 @@ def api_register():
     if username == ADMIN_USERNAME:
         return jsonify({"success": False, "message": "لا يمكن استخدام هذا الاسم"})
 
-    # تسجيل مباشر بدون موافقة مسبقة
+    # تسجيل مع حالة pending (في انتظار الموافقة)
     db["users"][username] = {
         "password": hashlib.sha256(password.encode()).hexdigest(),
         "is_admin": False,
@@ -411,30 +443,37 @@ def api_register():
         "max_servers": db["plans"]["free"]["max_servers"],
         "expiry_days": 365,
         "last_login": None,
-        "telegram_id": None,
+        "telegram_id": telegram_id if telegram_id else None,
         "api_key": None,
         "storage_limit": db["plans"]["free"]["storage"],
-        "plan": "free"
+        "plan": "free",
+        "status": "pending"
     }
     save_db(db)
+
+    # إنشاء مجلد المستخدم
     user_dir = os.path.join(USERS_DIR, username)
     os.makedirs(user_dir, exist_ok=True)
     os.makedirs(os.path.join(user_dir, "SERVERS"), exist_ok=True)
 
-    # إشعار للأدمن (إعلام فقط، ليس للموافقة)
+    # إشعار للأدمن بوجود طلب جديد
+    admin_msg = (
+        f"🔔 *طلب تسجيل جديد في MERO HOST!*\n"
+        f"👤 المستخدم: `{username}`\n"
+        f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        f"📱 تليجرام: {telegram_id or 'غير مرتبط'}\n\n"
+        f"للقبول: `/approve_{username}`\n"
+        f"للرفض: `/reject_{username}`"
+    )
     threading.Thread(
         target=notify_admin,
-        args=(
-            f"🔔 *مستخدم جديد اشترك في MERO HOST!*\n"
-            f"👤 المستخدم: `{username}`\n"
-            f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        ),
+        args=(admin_msg,),
         daemon=True
     ).start()
 
     return jsonify({
         "success": True,
-        "message": f"✅ تم إنشاء حسابك بنجاح! يمكنك تسجيل الدخول الآن."
+        "message": "✅ تم إرسال طلب التسجيل للمطور. سيتم إعلامك عند الموافقة."
     })
 
 @app.route('/api/login', methods=['POST'])
@@ -452,7 +491,16 @@ def api_login():
         return jsonify({"success": True, "redirect": "/admin", "is_admin": True})
 
     user = db["users"].get(username)
-    if user and user["password"] == hashlib.sha256(password.encode()).hexdigest():
+    if not user:
+        return jsonify({"success": False, "message": "المستخدم غير موجود"})
+    
+    # التحقق من حالة الحساب
+    if user.get("status") == "pending":
+        return jsonify({"success": False, "message": "⏳ حسابك في انتظار موافقة المطور"})
+    if user.get("status") == "rejected":
+        return jsonify({"success": False, "message": "❌ تم رفض حسابك من قبل المطور"})
+    
+    if user["password"] == hashlib.sha256(password.encode()).hexdigest():
         session.clear()
         session['username'] = username
         session.permanent = True
@@ -478,9 +526,197 @@ def api_current_user():
                 "success": True,
                 "username": session["username"],
                 "is_admin": u.get("is_admin", False) or session["username"] == ADMIN_USERNAME,
-                "plan": u.get("plan", "free")
+                "plan": u.get("plan", "free"),
+                "status": u.get("status", "approved")
             })
     return jsonify({"success": False})
+
+# ============== دوال قبول ورفض المستخدمين ==============
+
+@app.route('/api/admin/approve-user', methods=['POST'])
+def approve_user():
+    """قبول مستخدم"""
+    if 'username' not in session or not is_admin(session['username']):
+        return jsonify({"success": False, "message": "غير مصرح"}), 403
+    
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    
+    if not username:
+        return jsonify({"success": False, "message": "اسم المستخدم مطلوب"})
+    
+    if username not in db["users"]:
+        return jsonify({"success": False, "message": "المستخدم غير موجود"})
+    
+    user = db["users"][username]
+    
+    # تغيير الحالة إلى approved
+    user["status"] = "approved"
+    save_db(db)
+    
+    # إشعار للمستخدم
+    tg_id = user.get("telegram_id")
+    if tg_id:
+        msg = (
+            f"🎉 *تم قبول حسابك في MERO HOST!*\n"
+            f"👤 المستخدم: `{username}`\n"
+            f"✅ يمكنك الآن تسجيل الدخول واستخدام خدماتنا.\n\n"
+            f"🔗 {ADMIN_TELEGRAM_USERNAME}"
+        )
+        threading.Thread(target=notify_user, args=(tg_id, msg), daemon=True).start()
+    
+    # إشعار للأدمن بالتأكيد
+    notify_admin(f"✅ تم قبول المستخدم `{username}`")
+    
+    return jsonify({"success": True, "message": f"✅ تم قبول المستخدم {username}"})
+
+
+@app.route('/api/admin/reject-user', methods=['POST'])
+def reject_user():
+    """رفض مستخدم"""
+    if 'username' not in session or not is_admin(session['username']):
+        return jsonify({"success": False, "message": "غير مصرح"}), 403
+    
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    
+    if not username:
+        return jsonify({"success": False, "message": "اسم المستخدم مطلوب"})
+    
+    if username not in db["users"]:
+        return jsonify({"success": False, "message": "المستخدم غير موجود"})
+    
+    user = db["users"][username]
+    
+    # تغيير الحالة إلى rejected
+    user["status"] = "rejected"
+    save_db(db)
+    
+    # إشعار للمستخدم
+    tg_id = user.get("telegram_id")
+    if tg_id:
+        msg = (
+            f"❌ *تم رفض حسابك في MERO HOST*\n"
+            f"👤 المستخدم: `{username}`\n"
+            f"للتواصل مع الدعم: {ADMIN_TELEGRAM_USERNAME}"
+        )
+        threading.Thread(target=notify_user, args=(tg_id, msg), daemon=True).start()
+    
+    # إشعار للأدمن بالتأكيد
+    notify_admin(f"❌ تم رفض المستخدم `{username}`")
+    
+    return jsonify({"success": True, "message": f"❌ تم رفض المستخدم {username}"})
+
+
+@app.route('/api/admin/pending-users', methods=['GET'])
+def get_pending_users():
+    """جلب قائمة المستخدمين المعلقين"""
+    if 'username' not in session or not is_admin(session['username']):
+        return jsonify({"success": False, "message": "غير مصرح"}), 403
+    
+    pending = []
+    for username, data in db["users"].items():
+        if data.get("status") == "pending" and username != ADMIN_USERNAME:
+            pending.append({
+                "username": username,
+                "created_at": data.get("created_at"),
+                "telegram_id": data.get("telegram_id"),
+                "plan": data.get("plan", "free")
+            })
+    
+    return jsonify({"success": True, "users": pending})
+
+# ============== أوامر البوت للقبول والرفض ==============
+@app.route('/webhook', methods=['POST'])
+def telegram_webhook():
+    """استقبال أوامر البوت من تيليجرام"""
+    data = request.get_json()
+    
+    if 'message' not in data:
+        return jsonify({"status": "ok"})
+    
+    msg = data['message']
+    chat_id = msg.get('chat', {}).get('id')
+    text = msg.get('text', '').strip()
+    
+    # التحقق من أن المرسل هو الأدمن
+    if str(chat_id) != str(ADMIN_TELEGRAM_ID):
+        return jsonify({"status": "ok"})
+    
+    # أوامر القبول والرفض
+    if text.startswith('/approve_'):
+        username = text.replace('/approve_', '').strip()
+        if username in db["users"] and db["users"][username].get("status") == "pending":
+            db["users"][username]["status"] = "approved"
+            save_db(db)
+            
+            # إشعار للمستخدم
+            tg_id = db["users"][username].get("telegram_id")
+            if tg_id:
+                msg = (
+                    f"🎉 *تم قبول حسابك في MERO HOST!*\n"
+                    f"👤 المستخدم: `{username}`\n"
+                    f"✅ يمكنك الآن تسجيل الدخول."
+                )
+                threading.Thread(target=notify_user, args=(tg_id, msg), daemon=True).start()
+            
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": f"✅ تم قبول المستخدم `{username}`"},
+                timeout=10
+            )
+        else:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": f"❌ المستخدم `{username}` غير موجود أو غير معلق"},
+                timeout=10
+            )
+    
+    elif text.startswith('/reject_'):
+        username = text.replace('/reject_', '').strip()
+        if username in db["users"] and db["users"][username].get("status") == "pending":
+            db["users"][username]["status"] = "rejected"
+            save_db(db)
+            
+            # إشعار للمستخدم
+            tg_id = db["users"][username].get("telegram_id")
+            if tg_id:
+                msg = (
+                    f"❌ *تم رفض حسابك في MERO HOST*\n"
+                    f"👤 المستخدم: `{username}`\n"
+                    f"للتواصل مع الدعم: {ADMIN_TELEGRAM_USERNAME}"
+                )
+                threading.Thread(target=notify_user, args=(tg_id, msg), daemon=True).start()
+            
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": f"❌ تم رفض المستخدم `{username}`"},
+                timeout=10
+            )
+        else:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": f"❌ المستخدم `{username}` غير موجود أو غير معلق"},
+                timeout=10
+            )
+    
+    return jsonify({"status": "ok"})
+
+
+@app.route('/api/bot/set_webhook', methods=['GET', 'POST'])
+def set_webhook():
+    """تثبيت الويب هوك للبوت"""
+    base_url = request.host_url.rstrip('/')
+    webhook_url = f"{base_url}/webhook"
+    
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
+            json={"url": webhook_url}
+        )
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
 
 # ============== API Key ==============
 @app.route('/api/create_api_key', methods=['POST'])
@@ -523,14 +759,12 @@ def upgrade_plan():
     username = session['username']
     user = db["users"][username]
     
-    # تحديث خطة المستخدم
     user["plan"] = plan_id
     user["max_servers"] = plan["max_servers"]
     user["storage_limit"] = plan["storage"]
     
     save_db(db)
     
-    # إشعار للأدمن
     threading.Thread(
         target=notify_admin,
         args=(
@@ -560,7 +794,8 @@ def admin_users():
             "expiry_days": udata.get("expiry_days", 365),
             "telegram_id": udata.get("telegram_id"),
             "api_key": udata.get("api_key"),
-            "plan": udata.get("plan", "free")
+            "plan": udata.get("plan", "free"),
+            "status": udata.get("status", "approved")
         })
     return jsonify({"success": True, "users": users_list})
 
@@ -587,7 +822,8 @@ def admin_create_user():
         "telegram_id": None,
         "api_key": None,
         "storage_limit": 512000,
-        "plan": "free"
+        "plan": "free",
+        "status": "approved"
     }
     save_db(db)
     user_dir = os.path.join(USERS_DIR, username)
@@ -1313,5 +1549,5 @@ def bot_set_startup():
 
 # ============== التشغيل ==============
 if __name__ == "__main__":
-    port = int(os.environ.get("https://kingmodhost.xo.je/MT2/", 5000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
