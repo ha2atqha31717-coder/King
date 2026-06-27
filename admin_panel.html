@@ -48,12 +48,17 @@
         .btn-primary { background: linear-gradient(135deg, #2d7aff, #1a5cd8); border: none; border-radius: 50px; padding: 12px 24px; color: white; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(45, 122, 255, 0.3); }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(45, 122, 255, 0.4); }
         .btn-secondary { background: rgba(45, 122, 255, 0.15); border: 1px solid rgba(45, 122, 255, 0.3); border-radius: 50px; padding: 8px 20px; color: #2d7aff; font-weight: 600; font-size: 0.75rem; cursor: pointer; transition: 0.2s; }
+        .btn-success { background: linear-gradient(135deg, #00ff88, #00cc77); border: none; border-radius: 50px; padding: 8px 20px; color: #000; font-weight: 700; font-size: 0.75rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 255, 136, 0.3); }
+        .btn-danger { background: linear-gradient(135deg, #ff5e7c, #e04060); border: none; border-radius: 50px; padding: 8px 20px; color: #fff; font-weight: 700; font-size: 0.75rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-danger:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(255, 70, 85, 0.3); }
         .data-table { width: 100%; border-collapse: collapse; }
         .data-table th { text-align: right; padding: 14px 12px; color: #9ca3cf; font-weight: 500; font-size: 0.7rem; border-bottom: 1px solid rgba(45, 122, 255, 0.15); }
         .data-table td { padding: 14px 12px; border-bottom: 1px solid rgba(45, 122, 255, 0.08); font-size: 0.8rem; }
         .badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; }
         .badge-admin { background: rgba(45, 122, 255, 0.2); color: #2d7aff; }
         .badge-user { background: rgba(0, 229, 255, 0.15); color: #00e5ff; }
+        .badge-pending { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
         .action-btn { background: none; border: none; color: #ff5e7c; cursor: pointer; font-size: 1rem; margin: 0 4px; }
         .action-btn.edit { color: #2d7aff; }
         .search-box { position: relative; margin-bottom: 20px; }
@@ -67,6 +72,8 @@
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .modal-close { background: none; border: none; color: #9ca3cf; font-size: 1.3rem; cursor: pointer; }
         .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #2d7aff; border-radius: 60px; padding: 10px 24px; font-size: 0.75rem; z-index: 1100; display: none; }
+        .empty-state { text-align: center; padding: 30px; color: #9ca3cf; }
+        .empty-state i { font-size: 2rem; margin-bottom: 10px; opacity: 0.5; }
         @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } .form-row { grid-template-columns: 1fr; } .tabs-container { flex-direction: column; } .tab-btn { justify-content: center; } }
     </style>
 </head>
@@ -127,6 +134,7 @@
         <button class="tab-btn active" data-tab="dashboard"><i class="fas fa-chart-pie"></i> لوحة التحكم</button>
         <button class="tab-btn" data-tab="users"><i class="fas fa-users-gear"></i> إدارة المستخدمين</button>
         <button class="tab-btn" data-tab="servers"><i class="fas fa-globe"></i> السيرفرات</button>
+        <button class="tab-btn" data-tab="requests"><i class="fas fa-user-clock"></i> طلبات التسجيل</button>
         <button class="tab-btn" data-tab="settings"><i class="fas fa-sliders-h"></i> الإعدادات</button>
         <button class="tab-btn" data-tab="analytics"><i class="fas fa-chart-line"></i> التحليلات</button>
         <button class="tab-btn" data-tab="plans"><i class="fas fa-gem"></i> الخطط</button>
@@ -201,7 +209,37 @@
             <table class="data-table">
                 <thead><tr><th>اسم السيرفر</th><th>المالك</th><th>النوع</th><th>الحالة</th><th>تاريخ الإنشاء</th><th>الإجراءات</th></tr></thead>
                 <tbody id="serversList"><tr><td colspan="6" style="text-align:center;">جاري التحميل...</td></tr>
-             </table>
+             </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== REQUESTS TAB (جديد) ===== -->
+    <div id="requestsTab" class="tab-content">
+        <div class="card">
+            <div class="card-title"><i class="fas fa-user-clock" style="color: #ffd700;"></i> طلبات التسجيل (في انتظار الموافقة)</div>
+            <div id="pendingAlert"></div>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="pendingSearch" placeholder="ابحث عن طلب...">
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>اسم المستخدم</th>
+                        <th>تاريخ الطلب</th>
+                        <th>تليجرام</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="pendingList">
+                    <tr><td colspan="4" style="text-align:center;">جاري التحميل...</td></tr>
+                </tbody>
+            </table>
+            <div id="noPending" style="display:none; text-align:center; padding:30px; color:#9ca3cf;">
+                <i class="fas fa-check-circle" style="font-size:2rem; color:#00ff88;"></i>
+                <p style="margin-top:10px;">✅ لا توجد طلبات تسجيل في انتظار الموافقة</p>
+            </div>
         </div>
     </div>
 
@@ -317,10 +355,101 @@
             document.getElementById(tab + 'Tab').classList.add('active');
             if (tab === 'users') loadUsers();
             if (tab === 'servers') loadAllServers();
+            if (tab === 'requests') loadPendingRequests();
             if (tab === 'analytics') loadAnalytics();
             if (tab === 'plans') loadPlans();
         });
     });
+
+    // ===== تحميل الطلبات المعلقة =====
+    async function loadPendingRequests() {
+        try {
+            const res = await fetch('/api/admin/pending-users');
+            const data = await res.json();
+            const tbody = document.getElementById('pendingList');
+            const noPending = document.getElementById('noPending');
+            
+            if (data.success && data.users.length > 0) {
+                tbody.innerHTML = data.users.map(u => `
+                    <tr>
+                        <td><strong>${escapeHtml(u.username)}</strong></td>
+                        <td style="font-size:11px;">${(u.created_at || '').substring(0,10)}</td>
+                        <td>${u.telegram_id ? '📱 ' + escapeHtml(u.telegram_id) : '❌ غير مرتبط'}</td>
+                        <td>
+                            <button class="btn-success" style="padding:6px 16px; font-size:0.7rem;" onclick="approveUser('${escapeHtml(u.username)}')">
+                                <i class="fas fa-check"></i> قبول
+                            </button>
+                            <button class="btn-danger" style="padding:6px 16px; font-size:0.7rem;" onclick="rejectUser('${escapeHtml(u.username)}')">
+                                <i class="fas fa-times"></i> رفض
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                tbody.style.display = '';
+                noPending.style.display = 'none';
+                
+                document.getElementById('pendingSearch').oninput = function() {
+                    const q = this.value.toLowerCase();
+                    tbody.querySelectorAll('tr').forEach(r => {
+                        r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+                    });
+                };
+            } else {
+                tbody.style.display = 'none';
+                noPending.style.display = 'block';
+            }
+        } catch(e) {
+            document.getElementById('pendingList').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#ff5e7c;">❌ خطأ في تحميل الطلبات</td></tr>';
+        }
+    }
+
+    // ===== قبول مستخدم =====
+    async function approveUser(username) {
+        if (!confirm(`✅ هل تريد قبول المستخدم "${username}"؟`)) return;
+        
+        try {
+            const res = await fetch('/api/admin/approve-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('✅ تم قبول المستخدم ' + username, 'success');
+                loadPendingRequests();
+                loadUsers();
+                loadDashboard();
+            } else {
+                showToast('❌ ' + (data.message || 'فشل القبول'), 'error');
+            }
+        } catch(e) {
+            showToast('❌ خطأ في الاتصال', 'error');
+        }
+    }
+
+    // ===== رفض مستخدم =====
+    async function rejectUser(username) {
+        if (!confirm(`❌ هل تريد رفض المستخدم "${username}"؟`)) return;
+        
+        try {
+            const res = await fetch('/api/admin/reject-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('❌ تم رفض المستخدم ' + username, 'success');
+                loadPendingRequests();
+                loadUsers();
+                loadDashboard();
+            } else {
+                showToast('❌ ' + (data.message || 'فشل الرفض'), 'error');
+            }
+        } catch(e) {
+            showToast('❌ خطأ في الاتصال', 'error');
+        }
+    }
 
     // تحميل البيانات
     async function loadDashboard() {
@@ -585,6 +714,7 @@
     loadDashboard();
     loadUsers();
     loadAnalytics();
+    loadPendingRequests();
     setInterval(() => { loadDashboard(); loadAnalytics(); }, 30000);
 </script>
 </body>
