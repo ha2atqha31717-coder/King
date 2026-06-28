@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "📚 المساعدة:\n\n"
-        "هذا البوت يعمل بشكل مستمر على خادم 𝙼𝙴𝚁𝙾 𝙷𝙾𝚂𝚃\n"
+        "هذا البوت يعمل بشكل مستمر على خادم 𝙺𝙸𝙽𝙶 𝙼𝙾𝙳\n"
         "للاشتراك أو الاستفسار: @K_I_G_M"
     )
 
@@ -44,8 +44,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_message = update.message.text
     await update.message.reply_text(
         f"📨 تم استقبال رسالتك:\n\n{user_message}\n\n"
-        "شكراً لاستخدامك 𝙼𝙴𝚁𝙾 𝙷𝙾𝚂𝚃!\n"
-        "🛠 @I_tt_6"
+        "شكراً لاستخدامك 𝙺𝙸𝙽𝙶 𝙼𝙾𝙳!\n"
+        "🛠 @K_I_G_M"
     )
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -63,7 +63,7 @@ def run_bot(token: str, bot_name: str) -> None:
         application.add_handler(CommandHandler("info", info_command))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         application.add_error_handler(error_handler)
-        print(f" ✅ البوت {bot_name} جاهز الآن على 𝙼𝙴𝚁𝙾 𝙷𝙾𝚂𝚃!")
+        print(f" ✅ البوت {bot_name} جاهز الآن على 𝙺𝙸𝙽𝙶 𝙼𝙾𝙳!")
         print(" 📡 الحالة: نشط وينتظر الرسائل...\n")
         application.run_polling()
     except Exception as e:

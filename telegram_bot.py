@@ -17,10 +17,10 @@ BOT_TOKEN = "8107118673:AAG6xUifqFD5qtCWZMy_D9qEmC8HOCx4DBo"
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://mero-host.onrender.com")
 
 # إيدي الأدمن على تليجرام
-ADMIN_TELEGRAM_IDS = [7970883512]
+ADMIN_TELEGRAM_IDS = [8394089237]
 
 # معلومات المطور
-DEVELOPER_INFO = "🛠 طُوِّر بواسطة: *ᗴᒪᗰOᗪᗰᗴᑎ*\n📬 تواصل: @I_tt_6"
+DEVELOPER_INFO = "🛠 طُوِّر بواسطة: *ᗴᒪᗰOᗪᗰᗴᑎ*\n📬 تواصل: @K_I_G_M"
 
 # ========== حالات المحادثة ==========
 (
@@ -93,7 +93,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
 
     text = (
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "      𝙼𝙴𝚁𝙾 𝙷𝙾𝚂𝚃 🚀\n"
+        "      𝙺𝙸𝙽𝙶 𝙼𝙾𝙳 🚀\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
     )
     if username:
