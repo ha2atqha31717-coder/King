@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ELMODMEN HOST - تسجيل الدخول</title>
+    <title>𝙺𝙸𝙽𝙶 𝙼𝙾𝙳 - تسجيل الدخول</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -73,7 +73,26 @@
         
         /* ===== الشعار ===== */
         .brand { text-align: center; margin-bottom: 32px; }
-        .brand-icon { width: 72px; height: 72px; background: linear-gradient(145deg, #0a1628, #0d1a2e); border: 1.5px solid rgba(26,74,138,0.5); border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #4a9aff; margin: 0 auto 16px; box-shadow: 0 0 24px rgba(26,74,138,0.2), 0 0 60px rgba(26,74,138,0.08); animation: pulseGlow 3s ease-in-out infinite; }
+        .brand-icon { 
+            width: 72px; 
+            height: 72px; 
+            background: linear-gradient(145deg, #0a1628, #0d1a2e); 
+            border: 1.5px solid rgba(26,74,138,0.5); 
+            border-radius: 22px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 0 auto 16px; 
+            box-shadow: 0 0 24px rgba(26,74,138,0.2), 0 0 60px rgba(26,74,138,0.08); 
+            animation: pulseGlow 3s ease-in-out infinite; 
+            overflow: hidden;
+        }
+        .brand-icon img {
+            width: 55px;
+            height: 55px;
+            border-radius: 12px;
+            object-fit: cover;
+        }
         @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 24px rgba(26,74,138,0.2); transform: scale(1); } 50% { box-shadow: 0 0 50px rgba(26,74,138,0.35); transform: scale(1.05); } }
         .brand-name { font-size: 1.5rem; font-weight: 800; letter-spacing: 3px; background: linear-gradient(135deg, #4a9aff, #1a6ad8); -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 4s ease-in-out infinite; background-size: 200% 200%; }
         @keyframes shimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
@@ -173,15 +192,17 @@
 <!-- ===== صورة من تحت ===== -->
 <div class="footer-brand">
     <i class="fas fa-cloud"></i>
-    <span>ELMODMEN HOST</span>
+    <span>𝙺𝙸𝙽𝙶 𝙼𝙾𝙳</span>
 </div>
 
 <div class="login-wrap">
     <div class="login-card">
-        <!-- ===== الشعار ===== -->
+        <!-- ===== الشعار مع الصورة ===== -->
         <div class="brand">
-            <div class="brand-icon"><i class="fas fa-cloud"></i></div>
-            <div class="brand-name">ELMODMEN HOST</div>
+            <div class="brand-icon">
+                <img src="https://i.postimg.cc/YCGcSH9D/IMG-20260613-201939-738.jpg" style="width:55px; height:55px; border-radius:12px; object-fit:cover;">
+            </div>
+            <div class="brand-name">𝙺𝙸𝙽𝙶 𝙼𝙾𝙳</div>
             <div class="brand-sub">CLOUD HOSTING PLATFORM</div>
         </div>
 
@@ -251,7 +272,6 @@
                     <i class="fas fa-check-circle input-icon"></i>
                 </div>
             </div>
-            <!-- ===== التعديل هنا: "تم الإرسال!" → "إنشاء حساب" ===== -->
             <button class="submit-btn" id="registerBtn" onclick="doRegister()">
                 <span id="registerText"><i class="fas fa-user-plus"></i> إنشاء حساب</span>
                 <div class="spinner-sm" id="registerSpinner"></div>
@@ -266,7 +286,7 @@
 
         <!-- ===== تذييل ===== -->
         <div class="footer-note">
-            🛠 بواسطة <a href="https://t.me/I_tt_6" target="_blank">@I_tt_6</a> &nbsp;|&nbsp; ELMODMEN HOST © 2025
+            🛠 بواسطة <a href="https://t.me/I_tt_6" target="_blank">@I_tt_6</a> &nbsp;|&nbsp; 𝙺𝙸𝙽𝙶 𝙼𝙾𝙳 © 2025
         </div>
     </div>
 </div>
