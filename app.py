@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import re
+import socket
 import sys
 import hashlib
 import secrets
@@ -389,6 +390,108 @@ def _check_admin_access():
             return True
     return False
 
+# ============== حماية الملفات الحساسة ==============
+@app.route('/.env')
+@app.route('/db.json')
+@app.route('/users.json')
+@app.route('/config.json')
+@app.route('/.git/config')
+@app.route('/Procfile')
+@app.route('/runtime.txt')
+@app.route('/vercel.json')
+def deny_sensitive_files():
+    """منع الوصول للملفات الحساسة"""
+    return jsonify({"error": "🚫 غير مصرح بالوصول"}), 403
+
+@app.route('/USERS/')
+@app.route('/USERS/<path:filename>')
+def deny_users_folder(filename=None):
+    """منع الوصول لمجلد المستخدمين"""
+    return jsonify({"error": "🚫 غير مصرح بالوصول"}), 403
+
+@app.route('/static/<path:filename>')
+def deny_static_files(filename):
+    """منع الوصول للملفات الثابتة الحساسة"""
+    if filename.endswith(('.py', '.json', '.env', '.log', '.db', '.pem', '.key')):
+        return jsonify({"error": "🚫 غير مصرح بالوصول"}), 403
+    return send_from_directory('static', filename)
+
+# ============== حماية API ==============
+API_KEYS = {
+    "admin": "MERO_HOST_SECURE_KEY_2026_XK9"
+}
+
+def require_api_key(f):
+    """Decorator للتحقق من مفتاح API"""
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        if not api_key or api_key not in API_KEYS.values():
+            return jsonify({"error": "🚫 مفتاح API غير صالح"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# ============== حماية رفع الملفات ==============
+ALLOWED_EXTENSIONS = {'py', 'txt', 'json', 'env', 'zip', 'js', 'html', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'md'}
+
+def allowed_file(filename):
+    """التحقق من صيغة الملف المسموح بها"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def sanitize_filename(filename):
+    """تنظيف اسم الملف من الأحرف الضارة"""
+    return re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+
+# ============== حماية تسجيل الدخول ==============
+login_attempts = {}
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    
+    # منع الهجمات (Rate Limiting بسيط)
+    ip = request.remote_addr
+    if ip in login_attempts:
+        if login_attempts[ip] >= 5:
+            return jsonify({"success": False, "message": "⛔ تم تجاوز عدد المحاولات المسموحة، حاول بعد 5 دقائق"}), 429
+    else:
+        login_attempts[ip] = 0
+
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD_RAW:
+        login_attempts[ip] = 0
+        session.clear()
+        session['username'] = username
+        session.permanent = True
+        db["users"][ADMIN_USERNAME]["last_login"] = str(datetime.now())
+        save_db(db)
+        return jsonify({"success": True, "redirect": "/admin", "is_admin": True})
+
+    user = db["users"].get(username)
+    if not user:
+        login_attempts[ip] += 1
+        return jsonify({"success": False, "message": "المستخدم غير موجود"})
+    
+    # التحقق من حالة الحساب
+    if user.get("status") == "pending":
+        return jsonify({"success": False, "message": "⏳ حسابك في انتظار موافقة المطور"})
+    if user.get("status") == "rejected":
+        return jsonify({"success": False, "message": "❌ تم رفض حسابك من قبل المطور"})
+    
+    if user["password"] == hashlib.sha256(password.encode()).hexdigest():
+        login_attempts[ip] = 0
+        session.clear()
+        session['username'] = username
+        session.permanent = True
+        user["last_login"] = str(datetime.now())
+        save_db(db)
+        return jsonify({"success": True, "redirect": "/dashboard", "is_admin": False})
+    
+    login_attempts[ip] += 1
+    return jsonify({"success": False, "message": "بيانات غير صحيحة"})
+
 # ============== الصفحات ==============
 @app.route('/')
 def home():
@@ -475,40 +578,6 @@ def api_register():
         "success": True,
         "message": "✅ تم إرسال طلب التسجيل للمطور. سيتم إعلامك عند الموافقة."
     })
-
-@app.route('/api/login', methods=['POST'])
-def api_login():
-    data = request.get_json()
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD_RAW:
-        session.clear()
-        session['username'] = username
-        session.permanent = True
-        db["users"][ADMIN_USERNAME]["last_login"] = str(datetime.now())
-        save_db(db)
-        return jsonify({"success": True, "redirect": "/admin", "is_admin": True})
-
-    user = db["users"].get(username)
-    if not user:
-        return jsonify({"success": False, "message": "المستخدم غير موجود"})
-    
-    # التحقق من حالة الحساب
-    if user.get("status") == "pending":
-        return jsonify({"success": False, "message": "⏳ حسابك في انتظار موافقة المطور"})
-    if user.get("status") == "rejected":
-        return jsonify({"success": False, "message": "❌ تم رفض حسابك من قبل المطور"})
-    
-    if user["password"] == hashlib.sha256(password.encode()).hexdigest():
-        session.clear()
-        session['username'] = username
-        session.permanent = True
-        user["last_login"] = str(datetime.now())
-        save_db(db)
-        return jsonify({"success": True, "redirect": "/dashboard", "is_admin": False})
-
-    return jsonify({"success": False, "message": "بيانات غير صحيحة"})
 
 @app.route('/api/logout', methods=['GET', 'POST'])
 def api_logout():
@@ -1146,7 +1215,13 @@ def upload_files(folder):
         try:
             if not f or not f.filename or '..' in f.filename:
                 continue
-            save_path = os.path.join(srv["path"], f.filename)
+            # التحقق من صيغة الملف
+            if not allowed_file(f.filename):
+                errors_list.append(f"⚠️ صيغة غير مسموحة: {f.filename}")
+                continue
+            # تنظيف اسم الملف
+            safe_filename = sanitize_filename(f.filename)
+            save_path = os.path.join(srv["path"], safe_filename)
             f.save(save_path)
             uploaded += 1
         except Exception as e:
